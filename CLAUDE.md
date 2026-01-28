@@ -1,6 +1,6 @@
 # Hytale Server Plugin Development Guide
 
-## Project: WorldManagerPlugin
+## Project: WorldManager
 
 ## Project Structure
 
@@ -201,6 +201,22 @@ boolean removed = universe.removeWorld("worldName");
 ### Chunk Storage Types
 - `"Empty"` - No persistence
 - `"Hytale"` - Default storage
+
+### Save/Universe Folder Structure
+
+```
+/saves/                          <- Saves created from launcher
+  └── MyGame/                    <- A single "save" (game profile)
+      └── universe/              <- Universe folder (contains all worlds)
+          ├── default/           <- Main world (created automatically)
+          └── myCustomWorld/     <- Worlds created with /wm create
+```
+
+- **Saves** (launcher): Game profiles visible in the launcher menu
+- **Universe**: Container for all worlds within a save
+- **Worlds**: Individual worlds created via plugin live inside `universe/`
+
+Worlds created with `Universe.makeWorld()` are stored in `universe/<worldName>/` and persist across server restarts. They won't appear as separate "saves" in the launcher - they exist within the active save's universe.
 
 ## Player Teleportation
 
