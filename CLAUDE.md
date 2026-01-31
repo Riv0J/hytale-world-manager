@@ -5,9 +5,8 @@
 ```
 src/main/java/com/wm/
 ├── WorldManagerPlugin.java  # Entrypoint
-├── WMCommand.java           # /wm command
-├── WorldManager.java        # World CRUD
-└── WorldTeleportation.java  # Teleport logic
+├── WMCommand.java           # /wm commands (wrappers)
+└── WorldManager.java        # listWorlds() helper
 ```
 
 **Entrypoint:** `com.wm.WorldManagerPlugin`
@@ -15,11 +14,38 @@ src/main/java/com/wm/
 ## Commands
 
 ```
-/wm create --name <world> [--type normal/flat/void/dummy]
-/wm delete --name <world>
+/wm add <world> [--type flat/void/dummy]
+/wm remove <world> [--destroy]
 /wm list
-/wm tp --name <world>
+/wm tp <world>
+/wm default <world>
+/wm spawn
 ```
+
+### Examples
+```
+/wm add lobby --type flat
+/wm add arena --type void
+/wm add myworld                 # defaults to normal
+/wm remove arena                # unloads from memory
+/wm remove arena --destroy      # permanently deletes files
+/wm tp lobby
+/wm default lobby
+/wm list                        # shows [default] marker
+```
+
+### Wrappers
+
+Most commands are wrappers around Hytale's built-in commands:
+
+| /wm command | Wraps |
+|-------------|-------|
+| `/wm add <world>` | `/world add <world>` |
+| `/wm remove <world>` | `/world remove <world>` |
+| `/wm tp <world>` | `/tp world <world>` |
+| `/wm default <world>` | `/world setdefault <world>` |
+| `/wm spawn` | `/world config spawn` |
+| `/wm list` | (own implementation) |
 
 **Permission:** `hytale.command.wm`
 
@@ -41,23 +67,23 @@ Output: `build/libs/WorldManager-x.x.x.jar` → copy to `mods/`
 
 ## Quick Reference
 
-### Create World
+### List Worlds
 ```java
-WorldManager.createWorld("name", WorldType.NORMAL);
+List<WorldManager.WorldInfo> worlds = WorldManager.listWorlds();
 ```
 
-### Teleport Player
+### Execute Hytale Commands Programmatically
 ```java
-WorldTeleportation.teleport(playerRef, "worldName");
+CommandManager.get().handleCommand(sender, "world add myworld");
+CommandManager.get().handleCommand(sender, "world remove myworld");
+CommandManager.get().handleCommand(sender, "tp world myworld");
 ```
 
-### Threading (IMPORTANT)
+### Permanently Delete World
 ```java
-// Entity ops MUST run on world thread
-world.execute(() -> {
-    playerRef.removeFromStore();
-    targetWorld.addPlayer(playerRef, transform);
-});
+World world = Universe.get().getWorld("name");
+world.getWorldConfig().setDeleteOnRemove(true);
+Universe.get().removeWorld("name");
 ```
 
 ## Key APIs

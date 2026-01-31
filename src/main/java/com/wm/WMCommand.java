@@ -1,164 +1,203 @@
 package com.wm;
 
+import com.hypixel.hytale.server.core.HytaleServer;
 import com.hypixel.hytale.server.core.Message;
 import com.hypixel.hytale.server.core.command.system.CommandContext;
-import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
+import com.hypixel.hytale.server.core.command.system.CommandManager;
 import com.hypixel.hytale.server.core.command.system.arguments.system.RequiredArg;
+import com.hypixel.hytale.server.core.command.system.arguments.system.OptionalArg;
+import com.hypixel.hytale.server.core.command.system.arguments.system.FlagArg;
 import com.hypixel.hytale.server.core.command.system.arguments.types.ArgTypes;
 import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
-import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
-import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
+import com.hypixel.hytale.server.core.universe.Universe;
+import com.hypixel.hytale.server.core.universe.world.World;
 
 import javax.annotation.Nonnull;
 import java.util.List;
 
-public class WMCommand extends CommandBase {
-    @Nonnull
-    private final RequiredArg<String> actionArg = this.withRequiredArg(
-            "action",
-            "Action: create/delete/list/tp",
-            ArgTypes.STRING
-    );
-
-    private final OptionalArg<String> nameArg = this.withOptionalArg(
-            "name",
-            "Name of the world to create/delete",
-            ArgTypes.STRING
-    );
-
-    private final OptionalArg<String> typeArg = this.withOptionalArg(
-            "type",
-            "World type: normal/flat/void/dummy (default: normal)",
-            ArgTypes.STRING
-    );
+public class WMCommand extends AbstractCommandCollection {
 
     public WMCommand() {
-        super("wm", "World manager command.");
-        // Restrict to admins/owners only
+        super("wm", "World manager commands");
         this.requirePermission("hytale.command.wm");
+
+        this.addSubCommand(new AddCommand());
+        this.addSubCommand(new RemoveCommand());
+        this.addSubCommand(new ListCommand());
+        this.addSubCommand(new TpCommand());
+        this.addSubCommand(new DefaultCommand());
+        this.addSubCommand(new SpawnCommand());
     }
 
-    @Override
-    protected void executeSync(@Nonnull CommandContext context) {
-        String action = context.get(this.actionArg);
-        String name = context.get(this.nameArg);
-        String type = context.get(this.typeArg);
+    // /wm add <world> [--type] - wrapper for /world add
+    private static class AddCommand extends CommandBase {
+        private final RequiredArg<String> worldArg = this.withRequiredArg(
+                "world", "World name", ArgTypes.STRING);
+        private final OptionalArg<String> typeArg = this.withOptionalArg(
+                "type", "World type: normal/flat/void/dummy", ArgTypes.STRING);
 
-        switch (action) {
-            case "create":
-                this.handleCreate(context, name, type);
-                break;
-            case "delete":
-                this.handleDelete(context, name);
-                break;
-            case "list":
-                this.handleList(context);
-                break;
-            case "tp":
-                this.handleTeleport(context, name);
-                break;
-            default:
-                this.send(context, "Available actions: create, delete, list, tp");
+        AddCommand() {
+            super("add", "Create a new world (wraps /world add)");
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            String worldName = ctx.get(this.worldArg);
+            String typeStr = ctx.get(this.typeArg);
+
+            // Build command: /world add <name> [--gen <type>]
+            String cmd = "world add " + worldName;
+            if(typeStr != null){
+                cmd += " --gen " + typeStr.substring(0, 1).toUpperCase() + typeStr.substring(1);
+            }
+            CommandManager.get().handleCommand(ctx.sender(), cmd);
+        }
+
+        private String mapToHytaleGen(String type) {
+            if (type == null) return null;
+            return switch (type.toLowerCase()) {
+                case "flat" -> "Flat";
+                case "void" -> "Void";
+                case "dummy" -> "Dummy";
+                case "normal" -> null;  // default, no need to specify
+                default -> null;
+            };
         }
     }
 
-    private void handleCreate(CommandContext ctx, String worldName, String typeStr) {
-        if (worldName == null) {
-            this.send(ctx, "Usage: /wm create --name <world_name> [--type normal/flat/void/dummy]");
-            return;
+    // /wm remove <world> [--destroy]
+    private static class RemoveCommand extends CommandBase {
+        private final RequiredArg<String> worldArg = this.withRequiredArg(
+                "world", "World name", ArgTypes.STRING);
+        private final FlagArg destroyFlag = this.withFlagArg(
+                "destroy", "To permanently delete world files from disk");
+
+        RemoveCommand() {
+            super("remove", "Unload world (add --destroy to permanently delete)");
         }
 
-        WorldManager.WorldType worldType = WorldManager.WorldType.NORMAL;
-        if (typeStr != null) {
-            WorldManager.WorldType parsed = WorldManager.WorldType.fromString(typeStr);
-            if (parsed == null) {
-                this.send(ctx, "Invalid world type '" + typeStr + "'. Available: normal, flat, void, dummy");
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            String worldName = ctx.get(this.worldArg);
+            boolean destroy = ctx.get(this.destroyFlag);
+
+            if (destroy) {
+                // --destroy: permanently delete from disk
+                destroyWorld(ctx, worldName);
+            } else {
+                // Default: just unload (wrapper for /world remove)
+                CommandManager.get().handleCommand(ctx.sender(), "world remove " + worldName);
+            }
+        }
+
+        private void destroyWorld(CommandContext ctx, String worldName) {
+            World world = Universe.get().getWorld(worldName);
+
+            if (world == null) {
+                send(ctx, "World '" + worldName + "' not found");
                 return;
             }
-            worldType = parsed;
-        }
 
-        final WorldManager.WorldType finalType = worldType;
-        WorldManager.createWorld(worldName, worldType)
-                .thenAccept(success -> {
-                    if (success) {
-                        this.send(ctx, "Created " + finalType.name().toLowerCase() + " world '" + worldName + "'!");
-                    } else {
-                        this.send(ctx, "World '" + worldName + "' already exists.");
-                    }
-                })
-                .exceptionally(error -> {
-                    this.send(ctx, "Error creating world: " + error.getMessage());
-                    return null;
-                });
-    }
+            String defaultWorld = HytaleServer.get().getConfig().getDefaults().getWorld();
+            if (worldName.equalsIgnoreCase(defaultWorld)) {
+                send(ctx, "Cannot destroy the default world. Change it first with /wm default <other>");
+                return;
+            }
 
-    private void handleDelete(CommandContext ctx, String worldName) {
-        if (worldName == null) {
-            this.send(ctx, "Usage: /wm delete --name <world_name>");
-            return;
-        }
+            if (Universe.get().getWorlds().size() == 1) {
+                send(ctx, "Cannot destroy the only loaded world");
+                return;
+            }
 
-        Boolean result = WorldManager.deleteWorld(worldName);
-        if (result == null) {
-            this.send(ctx, "World '" + worldName + "' does not exist.");
-        } else if (result) {
-            this.send(ctx, "Deleted world '" + worldName + "'.");
-        } else {
-            this.send(ctx, "Could not delete world '" + worldName + "'.");
+            // Set flag to delete files from disk
+            world.getWorldConfig().setDeleteOnRemove(true);
+
+            boolean removed = Universe.get().removeWorld(worldName);
+            if (removed) {
+                send(ctx, "Permanently deleted world '" + worldName + "'");
+            } else {
+                send(ctx, "Failed to destroy world '" + worldName + "'");
+            }
         }
     }
 
-    private void handleList(CommandContext ctx) {
-        List<WorldManager.WorldInfo> worlds = WorldManager.listWorlds();
-
-        if (worlds.isEmpty()) {
-            this.send(ctx, "No worlds loaded.");
-            return;
+    // /wm list
+    private static class ListCommand extends CommandBase {
+        ListCommand() {
+            super("list", "List all worlds");
         }
 
-        this.send(ctx, "Loaded worlds (" + worlds.size() + "):");
-        for (WorldManager.WorldInfo info : worlds) {
-            this.send(ctx, "  - " + info.getName() + " [" + info.getPlayerCount() + " players]");
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            List<WorldManager.WorldInfo> worlds = WorldManager.listWorlds();
+
+            if (worlds.isEmpty()) {
+                send(ctx, "No worlds loaded");
+                return;
+            }
+
+            String defaultWorld = HytaleServer.get().getConfig().getDefaults().getWorld();
+
+            send(ctx, "Worlds (" + worlds.size() + "):");
+            for (WorldManager.WorldInfo info : worlds) {
+                String name = info.getName();
+                boolean isDefault = name.equalsIgnoreCase(defaultWorld);
+                String line = "  - " + name + " [" + info.getPlayerCount() + " players]";
+                if (isDefault) {
+                    line += " [default]";
+                }
+                send(ctx, line);
+            }
         }
     }
 
-    private void handleTeleport(CommandContext ctx, String worldName) {
-        if (worldName == null) {
-            this.send(ctx, "Usage: /wm tp --name <world_name>");
-            return;
+    // /wm tp <world> - wrapper for /tp world <name>
+    private static class TpCommand extends CommandBase {
+        private final RequiredArg<String> worldArg = this.withRequiredArg(
+                "world", "World name", ArgTypes.STRING);
+
+        TpCommand() {
+            super("tp", "Teleport to a world (wraps /tp world)");
         }
 
-        if (!ctx.isPlayer()) {
-            this.send(ctx, "This command can only be used by players.");
-            return;
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            String worldName = ctx.get(this.worldArg);
+            CommandManager.get().handleCommand(ctx.sender(), "tp world " + worldName);
         }
-
-        Ref<EntityStore> entityRef = ctx.senderAsPlayerRef();
-
-        WorldTeleportation.teleport(entityRef, worldName)
-                .thenAccept(result -> {
-                    switch (result) {
-                        case SUCCESS:
-                            this.send(ctx, "Teleported to world '" + worldName + "'!");
-                            break;
-                        case WORLD_NOT_FOUND:
-                            this.send(ctx, "World '" + worldName + "' does not exist.");
-                            break;
-                        case ALREADY_IN_WORLD:
-                            this.send(ctx, "You are already in world '" + worldName + "'.");
-                            break;
-                        case PLAYER_NOT_IN_WORLD:
-                            this.send(ctx, "Error: Player is not in a world.");
-                            break;
-                        case ERROR:
-                            this.send(ctx, "Error teleporting to world.");
-                            break;
-                    }
-                });
     }
 
-    private void send(CommandContext ctx, String text) {
+    // /wm default <world> - wrapper for /world setdefault
+    private static class DefaultCommand extends CommandBase {
+        private final RequiredArg<String> worldArg = this.withRequiredArg(
+                "world", "World name", ArgTypes.STRING);
+
+        DefaultCommand() {
+            super("default", "Set the default world (wraps /world setdefault)");
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            String worldName = ctx.get(this.worldArg);
+            // Delegate to Hytale's built-in command
+            CommandManager.get().handleCommand(ctx.sender(), "world setdefault " + worldName);
+        }
+    }
+
+    // /wm spawn - wrapper for /world config setspawn
+    private static class SpawnCommand extends CommandBase {
+        SpawnCommand() {
+            super("spawn", "Set world spawn at current position (wraps /world config setspawn)");
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            CommandManager.get().handleCommand(ctx.sender(), "world config setspawn");
+        }
+    }
+
+    private static void send(CommandContext ctx, String text) {
         ctx.sender().sendMessage(Message.raw(text));
     }
 }
