@@ -1,0 +1,28 @@
+{
+  "Parent": "Default",
+  "World": {
+    "AllowBlockBreaking": false,
+    "AllowBlockGathering": false,
+    "AllowBlockPlacement": false
+  },
+  "Death": {
+    "ItemsLossMode": "None",
+    "RespawnController": {
+      "Type": "WorldSpawnPoint"
+    }
+  },
+  "Combat": {
+    "DisableNPCIncomingDamage": true,
+    "DisablePlayerIncomingDamage": true
+  },
+  "WorldMap": {
+    "DisplaySpawn": true,
+    "DisplayPlayers": true,
+    "DisplayHome": true,
+    "DisplayWarps": true,
+    "DisplayDeathMarker": true
+  },
+  "Player": {
+    "ArmorVisibilityOption": "All"
+  }
+}

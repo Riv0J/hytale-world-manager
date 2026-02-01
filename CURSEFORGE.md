@@ -2,8 +2,6 @@
 Adds /wm commands (better /world commands) for advanced and more comfortable world management.
 
 # Description
-Features:
-
 Adds commands for server admins (require /op to execute)
 
 - `/wm add <world> [--type normal/flat/void/dummy]` - Create a new world
@@ -12,6 +10,7 @@ Adds commands for server admins (require /op to execute)
 - `/wm tp <world>` - Teleport to a world
 - `/wm default <world>` - Set the default spawn world
 - `/wm spawn` - Set world spawn at current position
+- `/wm protect [--off]` - Disable block breaking in the current world (--off to allow block breaking)
 
 Using these commands, you will be able to easily manage multiple worlds.
 This is specially useful, as normal players will be able to travel between them using the native /warp command.

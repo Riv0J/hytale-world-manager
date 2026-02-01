@@ -12,6 +12,7 @@ import com.hypixel.hytale.server.core.command.system.basecommands.CommandBase;
 import com.hypixel.hytale.server.core.command.system.basecommands.AbstractCommandCollection;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.entity.entities.Player;
 
 import javax.annotation.Nonnull;
 import java.util.List;
@@ -28,6 +29,7 @@ public class WMCommand extends AbstractCommandCollection {
         this.addSubCommand(new TpCommand());
         this.addSubCommand(new DefaultCommand());
         this.addSubCommand(new SpawnCommand());
+        this.addSubCommand(new ProtectCommand());
     }
 
     // /wm add <world> [--type] - wrapper for /world add
@@ -194,6 +196,38 @@ public class WMCommand extends AbstractCommandCollection {
         @Override
         protected void executeSync(@Nonnull CommandContext ctx) {
             CommandManager.get().handleCommand(ctx.sender(), "world config setspawn");
+        }
+    }
+
+    // /wm protect [--off]
+    private static class ProtectCommand extends CommandBase {
+        private final FlagArg offFlag = this.withFlagArg(
+                "off", "Disable protection (allow block breaking)");
+
+        ProtectCommand() {
+            super("protect", "Enable/disable block protection for current world");
+        }
+
+        @Override
+        protected void executeSync(@Nonnull CommandContext ctx) {
+            if (!(ctx.sender() instanceof Player player)) {
+                send(ctx, "This command can only be run by a player");
+                return;
+            }
+
+            boolean disableProtection = ctx.get(this.offFlag);
+            World world = player.getWorld();
+            String worldName = world.getName();
+            String gameplayConfig = disableProtection ? "Default" : "WMProtected";
+
+            world.getWorldConfig().setGameplayConfig(gameplayConfig);
+            world.getWorldConfig().markChanged();
+
+            if (disableProtection) {
+                send(ctx, "Protection DISABLED for '" + worldName + "'");
+            } else {
+                send(ctx, "Protection ENABLED for '" + worldName + "'");
+            }
         }
     }
 
