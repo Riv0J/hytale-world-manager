@@ -16,11 +16,29 @@ src/main/java/com/wm/
 ```
 /wm add <world> [--type flat/void/dummy]
 /wm remove <world> [--destroy]
-/wm list
+/wm list                              # shows [default] [protected] markers
 /wm tp <world>
 /wm default <world>
 /wm spawn
+/wm protect [--off]
+/wm clone <clone_name>
 ```
+
+### Potential Commands
+
+```
+/wm masstp <world> [--all]            # --all: all server players, default: current world players
+/wm rename <new_name>                 # drain players → save → unload → rename folder → load → return players
+```
+
+#### masstp notes
+- Uses `World.drainPlayersTo(targetWorld)` to move all players from one world to another
+- Without --all: moves players from sender's current world to target
+- With --all: iterates all worlds and drains them to target
+
+#### rename notes
+- Workaround: `/wm clone newName` → `/wm tp newName` → `/wm remove oldName --destroy`
+- Native rename would need: handle default world update, save world, unload, rename disk folder, reload, move players back
 
 ### Examples
 ```

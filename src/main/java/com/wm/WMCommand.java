@@ -30,6 +30,7 @@ public class WMCommand extends AbstractCommandCollection {
         this.addSubCommand(new DefaultCommand());
         this.addSubCommand(new SpawnCommand());
         this.addSubCommand(new ProtectCommand());
+        this.addSubCommand(new CloneCommand());
     }
 
     // /wm add <world> [--type] - wrapper for /world add
@@ -149,6 +150,9 @@ public class WMCommand extends AbstractCommandCollection {
                 if (isDefault) {
                     line += " [default]";
                 }
+                if (info.isProtected()) {
+                    line += " [protected]";
+                }
                 send(ctx, line);
             }
         }
@@ -218,7 +222,7 @@ public class WMCommand extends AbstractCommandCollection {
             boolean disableProtection = ctx.get(this.offFlag);
             World world = player.getWorld();
             String worldName = world.getName();
-            String gameplayConfig = disableProtection ? "Default" : "WMProtected";
+            String gameplayConfig = disableProtection ? "Default" : "CreativeHub";
 
             world.getWorldConfig().setGameplayConfig(gameplayConfig);
             world.getWorldConfig().markChanged();

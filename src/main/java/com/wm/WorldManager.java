@@ -24,7 +24,8 @@ public final class WorldManager {
             World world = entry.getValue();
             result.add(new WorldInfo(
                     entry.getKey(),
-                    world.getPlayerCount()
+                    world.getPlayerCount(),
+                    world.getWorldConfig().getGameplayConfig()
             ));
         }
         return result;
@@ -33,10 +34,12 @@ public final class WorldManager {
     public static class WorldInfo {
         private final String name;
         private final int playerCount;
+        private final String gameplayConfig;
 
-        public WorldInfo(String name, int playerCount) {
+        public WorldInfo(String name, int playerCount, String gameplayConfig) {
             this.name = name;
             this.playerCount = playerCount;
+            this.gameplayConfig = gameplayConfig;
         }
 
         public String getName() {
@@ -45,6 +48,14 @@ public final class WorldManager {
 
         public int getPlayerCount() {
             return playerCount;
+        }
+
+        public String getGameplayConfig() {
+            return gameplayConfig;
+        }
+
+        public boolean isProtected() {
+            return "ForgottenTemple".equals(gameplayConfig) || "CreativeHub".equals(gameplayConfig);
         }
     }
 }
